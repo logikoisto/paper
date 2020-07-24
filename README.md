@@ -4,5 +4,4 @@
 ## 分布式领域
 | 论文  |  翻译  |  译者   |  解读 |
 |:----:| :----: | :----: |:----: |
-| [Dgraph: Synchronously Replicated, Transactional and Distributed GraphDatabase](https://dgraph.io/paper)|[Dgraph: 同步复制,事务,分布式图数据库](distributed/dgraph.md)| 权权 |  无 |
-
+| [Dgraph](https://dgraph.io/paper)|[Dgraph:图数据库](distributed/dgraph.md)| 孙权 |  无 |
