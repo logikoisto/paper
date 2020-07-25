@@ -26,7 +26,7 @@
 
 ![图1](image/dgraph01.png)
 
-如图1所示:Dgraph架构,由一个zero group和多个alpha group组成,每个组都是由一个或多个成员节点组成的raft小组
+`如图1所示:Dgraph架构,由一个zero group和多个alpha group组成,每个组都是由一个或多个成员节点组成的raft小组`
 
 ​	这种联系的使用取决于他们之间的关系,例如一个raft主从之间会有心跳和数据流(100毫秒),而一个alpha只会在处理查询和突变时与另一个组的alpha节点交换信息.每个开发连接都有轻量级的健康检查,以避免在目标服务器的通信时响应失败,Alpah与Zero都公开了一个GRPC端口用于内部通信,此外Alpha还使用外部端口用于与GRPC外部官方客户端进行通信。				Zero还运行着一个oracle,为集群中的事务分配单调递增的逻辑时间戳(与系统时间无关),Zero组的领导者通常会通过Raft协议出租一块时间戳带宽,然后在没有任何进一步的协调的情况下严格的从存储器中为时间戳请求提供服务,Zero oracle 用于跟踪协助事务提交的附加内容,这将在第五节详细说明。
 ​	Zero从每个组的raft领导者那里获得每个组中数据大小的信息,它用这些信息来做出关于分片移动的决策,这将在2.4节中详细说明.
@@ -83,7 +83,7 @@ value = <0xab, 0xbc, 0xcd, ...>
 
 ![图2](image/dgraph02.png)
 
-如图二所示:存储在组varint-encoded-block中的发布列表结构
+`如图二所示:存储在组varint-encoded-block中的发布列表结构`
 
 ​	多亏了使用这样的技术,一次边缘遍历只对应于一次Badger查询。例如,查找X的所有关注者的列表将涉及到查找<Follower,X> key，该键将给出包含所有关注者的uid的Postings List。 可以进行进一步的查找,以获得关注者发布的PostingList。 通过进行两次查找,然后相交<Follower，X>和<Follower，Y>的排序后的INT列表,可以找到X和Y之间的共同关注者。 注意,分布式连接和(基于对象的)遍历只需要通过网络传输UID,这也是非常高效的。 所有这些都允许Dgraph非常高效地执行这些操作,而不会向典型的`select * from table where X=Y`方式的查询
 
@@ -106,7 +106,7 @@ value = <0xab, 0xbc, 0xcd, ...>
 
 ![图3:](image/dgraph03.png)
 
-图三所示: 数据分片
+`图三所示: 数据分片`
 ​		
 
 ### 	数据的再平衡
@@ -179,7 +179,7 @@ type Tokenizer interface {
 
 ![图4](image/dgraph04.png)
 
-图4:MVCC
+`图4:MVCC`
 
 ​	在Dgraph中设计事务时，我们研究了Spanner [13]，HBase [11]，Percolator [17]和其他人的论文。 Spanner最著名的是使用原子钟为事务分配时间戳。 这是以不具有基于GPS时钟同步机制的商品服务器上较低的写入吞吐量为代价的。 因此，我们拒绝了这个想法，而是希望拥有一个zero服务器,该服务器可以更快地处理逻辑时间戳。为避免zero成为单个故障点，我们运行了多个zero实例，形成了一个Raft组。 但是，这带来了一个独特的挑战，即在领导人选举的情况下如何进行切换。 Omid，Reloaded [11]（称为Omid2）文件通过利用外部系统来解决此问题。 在InOmid2中，它们运行备用时间戳服务器以接管领导者发生故障的情况。 该备用服务器不需要获取最新的交易状态信息,因为Omid2使用了Zookeeper [2]，这是用于维护事务日志的集中式服务。 同样，TiDB构建了TiKV，它对键值使用基于Raft的复制模型。 这样，每个TiDB的writeDB都会自动被认为是高度可用的。类似地，Bigtable [12]使用Google Filesystem [15]进行分布式存储。 因此，不需要直接的信息传输就可以在构成仲裁的多个服务器之间进行。
 
@@ -216,18 +216,18 @@ Propose(Ts ← Tc)
 
 ``` bash
 Algorithm 2 Watermark: Calculate DoneUntil (T,isPending)
-if T/∈ MinHeap then
-	MinHeap <- T
-end if
-pending(T) <- isPending
-curDoneTs <- DoneUntil
-for each minTs ∈ MinHeap.Peek() do
+    if T/∈ MinHeap then
+        MinHeap <- T
+    end if
+    pending(T) <- isPending
+    curDoneTs <- DoneUntil
+    for each minTs ∈ MinHeap.Peek() do
 	if pending(minTs) then
 		 break 
-	 end if
-	 MinHeap.Pop()
-	 curDoneTs <- minTs
-end for 
+	end if
+	MinHeap.Pop()
+	curDoneTs <- minTs
+   end for 
 DoneUntil <- curDoneTs
 ```
 
@@ -235,11 +235,11 @@ DoneUntil <- curDoneTs
 
 ![图5](image/dgraph05.png)
 
-图五所示:Max Assigned 用圆圈表示，实心圆圈表示完成。 开始时间戳1、2和4立即标记为完成。 提交时间戳3开始，并且在完成之前必须达成共识。 最高时间戳的标志保持串行,在该时间戳和低于该时间戳的所有工作都是如此。
+`图五所示:Max Assigned 用圆圈表示，实心圆圈表示完成。 开始时间戳1、2和4立即标记为完成。 提交时间戳3开始，并且在完成之前必须达成共识。 最高时间戳的标志保持串行,在该时间戳和低于该时间戳的所有工作都是如此。`
 
 ![图6](image/dgraph06.png)
 
-图六所示:MaxAssigned系统确保可线性化读取,高于当前MaxAS-Signed(MA)时间戳的读取必须阻止,以确保在应用readTimestamp之前向上写入。 TXN2接收开始TS3，并且读ATTS3必须确认直到TS2的任何写入
+`图六所示:MaxAssigned系统确保可线性化读取,高于当前MaxAS-Signed(MA)时间戳的读取必须阻止,以确保在应用readTimestamp之前向上写入。 TXN2接收开始TS3，并且读ATTS3必须确认直到TS2的任何写入`
 
 ​	在事务中止时,只需丢弃缓存。在事务提交时,使用提交时间戳将投递列表写入Badger。 最后,更新MaxAssignedTimestamp。
 
