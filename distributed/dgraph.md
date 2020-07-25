@@ -24,7 +24,9 @@
 
 ​	整个集群的元数据配置,会由zero传播给所有alpha节点。alpha通过这些配置信息,路由或者命中查询(或突变)。集群中的所有节点彼此连接,产生2*N^2个连接(N位集群节点的数量)。如下图[1]所示:
 
-![图1:Dgraph架构,由一个zero group和多个alpha group组成,每个组都是由一个或多个成员节点组成的raft小组](image/dgraph01.png)
+![图1](image/dgraph01.png)
+
+如图1所示:Dgraph架构,由一个zero group和多个alpha group组成,每个组都是由一个或多个成员节点组成的raft小组
 
 ​	这种联系的使用取决于他们之间的关系,例如一个raft主从之间会有心跳和数据流(100毫秒),而一个alpha只会在处理查询和突变时与另一个组的alpha节点交换信息.每个开发连接都有轻量级的健康检查,以避免在目标服务器的通信时响应失败,Alpah与Zero都公开了一个GRPC端口用于内部通信,此外Alpha还使用外部端口用于与GRPC外部官方客户端进行通信。				Zero还运行着一个oracle,为集群中的事务分配单调递增的逻辑时间戳(与系统时间无关),Zero组的领导者通常会通过Raft协议出租一块时间戳带宽,然后在没有任何进一步的协调的情况下严格的从存储器中为时间戳请求提供服务,Zero oracle 用于跟踪协助事务提交的附加内容,这将在第五节详细说明。
 ​	Zero从每个组的raft领导者那里获得每个组中数据大小的信息,它用这些信息来做出关于分片移动的决策,这将在2.4节中详细说明.
@@ -79,7 +81,9 @@ value = <0xab, 0xbc, 0xcd, ...>
 
 ​	在谓词指向宾语的常见情况下，PostingsList将主要由uid组成, 这些都是通过执行整数压缩进行优化的。 这些UID被分组为256个整数的块(可配置)，其中每个块都有一个基本BLOB和一个二进制BLOB。 BLOB是通过取当前值与上一个值的差值并以使用可变长整数编码的字节为单位存储差值来生成的。 这样产生的数据压缩比为10。在进行交叉点时，我们可以使用这些块进行二进制搜索或块跳转，以避免对所有块进行解码。 排序整数编码是一个热门的研究课题,在性能方面有很大的优化空间,目前正在进行使用RoaringBitmap[10]来组织该数据.
 
-![图2:存储在组varint-encoded-block中的发布列表结构](image/dgraph02.png)
+![图2](image/dgraph02.png)
+
+如图二所示:存储在组varint-encoded-block中的发布列表结构
 
 ​	多亏了使用这样的技术,一次边缘遍历只对应于一次Badger查询。例如,查找X的所有关注者的列表将涉及到查找<Follower,X> key，该键将给出包含所有关注者的uid的Postings List。 可以进行进一步的查找,以获得关注者发布的PostingList。 通过进行两次查找,然后相交<Follower，X>和<Follower，Y>的排序后的INT列表,可以找到X和Y之间的共同关注者。 注意,分布式连接和(基于对象的)遍历只需要通过网络传输UID,这也是非常高效的。 所有这些都允许Dgraph非常高效地执行这些操作,而不会向典型的`select * from table where X=Y`方式的查询
 
@@ -100,8 +104,9 @@ value = <0xab, 0xbc, 0xcd, ...>
 
 ​	在本例中，我们将有两个分片lives-in 和 eats。 作为最坏情况的总和，其中群集非常大，以至于每个碎片都驻留在单独的服务器上。 对于询问[People Who Living in SF and Eat Sushi]的查询,Dgraph将对包含Lives-in的服务器执行一次网络调用，并对居住在SF的所有人执行一次查找(*<Lives-in><SF>)。 在第二步中，它将获取这些结果并将其发送到包含寿司的服务器，执行一次查找以获得所有吃寿司的人(*<eats><sushi>)，并与上一步的结果集交叉以生成来自sf的吃寿司的最终列表。 以类似的方式，然后可以进一步过滤/联接该结果集，每个联接在一个网络调用中执行。
 
-![图3：数据分片](image/dgraph03.png)
+![图3:](image/dgraph03.png)
 
+图三所示: 数据分片
 ​		
 
 ### 	数据的再平衡
@@ -172,7 +177,9 @@ type Tokenizer interface {
 
 ​	Graph的设计目标是操作简单。 因此,目标之一是不依赖任何第三方制度。 事实证明,当不仅为数据而且为事务提供高可用性时,这很难实现。
 
-![图4:MVCC](image/dgraph04.png)
+![图4](image/dgraph04.png)
+
+图4:MVCC
 
 ​	在Dgraph中设计事务时，我们研究了Spanner [13]，HBase [11]，Percolator [17]和其他人的论文。 Spanner最著名的是使用原子钟为事务分配时间戳。 这是以不具有基于GPS时钟同步机制的商品服务器上较低的写入吞吐量为代价的。 因此，我们拒绝了这个想法，而是希望拥有一个zero服务器,该服务器可以更快地处理逻辑时间戳。为避免zero成为单个故障点，我们运行了多个zero实例，形成了一个Raft组。 但是，这带来了一个独特的挑战，即在领导人选举的情况下如何进行切换。 Omid，Reloaded [11]（称为Omid2）文件通过利用外部系统来解决此问题。 在InOmid2中，它们运行备用时间戳服务器以接管领导者发生故障的情况。 该备用服务器不需要获取最新的交易状态信息,因为Omid2使用了Zookeeper [2]，这是用于维护事务日志的集中式服务。 同样，TiDB构建了TiKV，它对键值使用基于Raft的复制模型。 这样，每个TiDB的writeDB都会自动被认为是高度可用的。类似地，Bigtable [12]使用Google Filesystem [15]进行分布式存储。 因此，不需要直接的信息传输就可以在构成仲裁的多个服务器之间进行。
 
@@ -191,14 +198,14 @@ type Tokenizer interface {
 ```bash
 Algorithm 1 Commit (Ts,Keys)
 foreach key k∈ Keys do
-	if lastCommit(k) > Ts then
-		Propose(Ts←abort)
-		return 
-	end if
+    if lastCommit(k) > Ts then
+	Propose(Ts←abort)
+	return 
+    end if
 end for
 Tc ← GetTimestamps(1)
 for each key k ∈ Keys do
-	lastCommit(k) ← T
+    lastCommit(k) ← T
 end for
 Propose(Ts ← Tc)
 ```
@@ -209,26 +216,30 @@ Propose(Ts ← Tc)
 
 ``` bash
 Algorithm 2 Watermark: Calculate DoneUntil (T,isPending)
-	if T/∈ MinHeap then
-		MinHeap <- T
-	end if
-	pending(T) <- isPending
-	curDoneTs <- DoneUntil
-	for each minTs ∈ MinHeap.Peek() do
-		if pending(minTs) then
-			 break 
-		 end if
-		 MinHeap.Pop()
-		 curDoneTs <- minTs
-	end for 
-	DoneUntil <- curDoneTs
+if T/∈ MinHeap then
+	MinHeap <- T
+end if
+pending(T) <- isPending
+curDoneTs <- DoneUntil
+for each minTs ∈ MinHeap.Peek() do
+	if pending(minTs) then
+		 break 
+	 end if
+	 MinHeap.Pop()
+	 curDoneTs <- minTs
+end for 
+DoneUntil <- curDoneTs
 ```
 
 ​	一旦Alpha领导者收到此更新,他们将以相同的顺序向他们的追随者提出，并应用更新。Alpha中的所有raft提案申请都是按顺序完成的。Alpha也有一个Oracle，用于跟踪待处理的事务。 它们维护开始时间戳，以及将所有更新的发布列表保存在内存中.
 
-![图5:Max Assigned 用圆圈表示，实心圆圈表示完成。 开始时间戳1、2和4立即标记为完成。 提交时间戳3开始，并且在完成之前必须达成共识。 最高时间戳的标志保持串行,在该时间戳和低于该时间戳的所有工作都是如此。](image/dgraph05.png)
+![图5](image/dgraph05.png)
 
-![图6：MaxAssigned系统确保可线性化读取,高于当前MaxAS-Signed(MA)时间戳的读取必须阻止,以确保在应用readTimestamp之前向上写入。 TXN2接收开始TS3，并且读ATTS3必须确认直到TS2的任何写入](image/dgraph06.png)
+图五所示:Max Assigned 用圆圈表示，实心圆圈表示完成。 开始时间戳1、2和4立即标记为完成。 提交时间戳3开始，并且在完成之前必须达成共识。 最高时间戳的标志保持串行,在该时间戳和低于该时间戳的所有工作都是如此。
+
+![图6](image/dgraph06.png)
+
+图六所示:MaxAssigned系统确保可线性化读取,高于当前MaxAS-Signed(MA)时间戳的读取必须阻止,以确保在应用readTimestamp之前向上写入。 TXN2接收开始TS3，并且读ATTS3必须确认直到TS2的任何写入
 
 ​	在事务中止时,只需丢弃缓存。在事务提交时,使用提交时间戳将投递列表写入Badger。 最后,更新MaxAssignedTimestamp。
 
